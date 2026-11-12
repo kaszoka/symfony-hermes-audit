@@ -47,6 +47,9 @@
   <!-- [HERMES-LEARNED-HEURISTICS: SUBAGENT-ALPHA - START] -->
   - [RULE-A001]: Before flagging a missing #[MapRequestPayload] or ObjectMapperInterface, verify the exact version of symfony/http-kernel and presence of symfony/object-mapper in composer.lock to avoid forcing Symfony 7.4/8.x APIs onto a 6.4 LTS project.
   - [RULE-A002]: In PHPUnit test classes (*Test.php), omitting the : void return type declaration is an intentional convention of Symfony Coding Standards—never flag this as a missing return type defect.
+  - [RULE-A003]: Yoda conditions apply EXCLUSIVELY to equality operators (==, !=, ===, !==). Never transform comparison operators (<, >, <=, >=). Converting $existing > 0 into 0 < $existing is strictly prohibited and invalid.
+  - [RULE-A004]: Never conflate missing route HTTP methods (methods: ['GET']) with controller refactoring (such as converting index() to __invoke()). Treat missing route methods as an optional hygiene recommendation (MINOR), not a critical defect.
+  - [RULE-A005]: Do not flag $entityManager->getRepository(...) as a "CRITICAL Service Locator Anti-Pattern". It is standard Doctrine. Directly injecting custom repositories is an optional clean-code preference (MINOR), never a critical defect.
   <!-- [HERMES-LEARNED-HEURISTICS: SUBAGENT-ALPHA - END] -->
 
 ---
@@ -64,6 +67,9 @@
   <!-- [HERMES-LEARNED-HEURISTICS: SUBAGENT-BETA - START] -->
   - [RULE-B001]: Before reporting an N+1 query issue on $collection->count() or $collection->contains(), verify in the entity class whether the relation specifies fetch: 'EXTRA_LAZY'. If present, it executes a single SELECT COUNT(*) without hydrating collection entities and does not require an eager JOIN.
   - [RULE-B002]: In paginated queries, remember that indiscriminately adding leftJoin to a to-many association with setMaxResults() without the Doctrine ORM Paginator will truncate related collection rows in SQL—require Doctrine ORM Paginator or two-phase ID fetching.
+  - [RULE-B003]: Do not flag @stream_socket_accept() or low-level socket stream polling as a security violation. In Symfony debug mode, ErrorHandler converts PHP warnings into ErrorException on timeout; stripping @ breaks polling loops.
+  - [RULE-B004]: Before reporting XSS on Twig |raw, inspect if the variable is an internal {% set %} buffer whose inner dynamic tags are already auto-escaped. Avoid false positive XSS claims on buffered markup.
+  - [RULE-B005]: When advising moving flush() outside loops, verify whether subsequent loop iterations perform findOneBy looking for entities created in previous iterations (since uncommitted entities are not seen by Doctrine queries unless flushed).
   <!-- [HERMES-LEARNED-HEURISTICS: SUBAGENT-BETA - END] -->
 
 ---
@@ -78,6 +84,7 @@
   <!-- [HERMES-LEARNED-HEURISTICS: SUBAGENT-GAMMA - START] -->
   - [RULE-G001]: Never defend $this->getParameter() in controllers or missing declare(strict_types=1); with arguments like "small project scale"—these are strict Zero-Bypass violations.
   - [RULE-G002]: Always block attempts by Subagent-Alpha to demand separate interfaces for application services that have only a single implementation and do not belong to a shared external package (per best_practices.rst).
+  - [RULE-G003]: Actively challenge and reject accusations regarding: socket @ silencing with timeout, $entityManager->getRepository() flagged as critical, Yoda conditions on inequality operators (<, >), and |raw on pre-escaped Twig buffers.
   <!-- [HERMES-LEARNED-HEURISTICS: SUBAGENT-GAMMA - END] -->
 
 ---
@@ -85,7 +92,7 @@
 ### SUBAGENT-DELTA: MECHANICAL AST & RST VERIFIER
 * **Operational Mandate**: Impartial fact-checker with zero architectural bias.
 * **Verification Protocol**:
-  1. Verifies byte-for-byte that quoted text in `local_rst_evidence.quoted_rule` actually exists in `.cache/symfony-docs/` (penalizes hallucinations with `HALLUCINATION_PENALTY`).
+  1. **Strict Verbatim Check**: Verifies that quoted text in `local_rst_evidence.quoted_rule` exists verbatim in the local `.cache/symfony-docs/` files. Any paraphrased or fabricated citation is rejected with `HALLUCINATION_PENALTY`.
   2. Cross-references accusations against `vendor/bin/phpstan` (max level) and `vendor/bin/rector --dry-run` from `initial-findings.json`.
   3. Inspects source lines and marks `delta_verification`:
      - `CONFIRMED_DEFECT` (valid defect backed by AST or verified `.rst` rule)
@@ -97,6 +104,10 @@
 
 ### SUBAGENT-OMEGA: CHIEF JUDGE & REFACTORING ARCHITECT
 * **Operational Mandate**: Evaluates `CONFIRMED_DEFECT` findings verified by Subagent-Delta. Resolves deadlocks via Circuit Breakers (max 3 stagnation iterations or max 5 unresolved dispute rounds) by ruling in favor of the AST static gate output.
+* **Severity & Counting Integrity**:
+  - `CRITICAL` is reserved exclusively for verified security vulnerabilities (SQLi, unescaped raw user input in templates), data loss, or production-crashing runtime exceptions.
+  - Architectural preferences (e.g. `$em->getRepository` vs constructor injection, missing route methods) must be categorized as `MINOR` or `INFORMATIONAL`.
+  - The summary count of sustained findings must mathematically match the exact number of catalog items in the report.
 * **Persistent Report Deliverables**:
   Writes the complete audit verdict directly to disk in `.cache/audit-reports/`:
   1. `.cache/audit-reports/audit-report.md` — Human-readable report detailing what is broken, why, and Bad vs. Good code.

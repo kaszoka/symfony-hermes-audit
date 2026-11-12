@@ -4,32 +4,32 @@
   "subagent_metrics": {
     "subagent_alpha": {
       "proposed_findings": 123,
-      "verified_findings": 123,
-      "rejected_false_positives": 0,
-      "accuracy_percentage": 100.0
+      "verified_findings": 110,
+      "rejected_false_positives": 13,
+      "accuracy_percentage": 89.43
     },
     "subagent_beta": {
       "proposed_findings": 12,
-      "verified_findings": 10,
-      "rejected_false_positives": 2,
-      "accuracy_percentage": 83.33
+      "verified_findings": 8,
+      "rejected_false_positives": 4,
+      "accuracy_percentage": 66.67
     },
     "subagent_gamma": {
-      "rebuttals_filed": 4,
-      "rebuttals_upheld": 2,
-      "rebuttals_dismissed": 2,
-      "defense_efficiency": 50.0
+      "rebuttals_filed": 6,
+      "rebuttals_upheld": 5,
+      "rebuttals_dismissed": 1,
+      "defense_efficiency": 83.33
     },
     "subagent_delta": {
       "mechanical_checks": 131,
       "ast_verifications": 131,
-      "doc_citation_checks": 8,
-      "hallucinations_blocked": 0
+      "doc_citation_checks": 14,
+      "hallucinations_blocked": 3
     },
     "subagent_epsilon": {
       "crystallized_rules_generated": 1,
-      "patterns_evolved": 3,
-      "prompt_calibrations_applied": 1,
+      "patterns_evolved": 7,
+      "prompt_calibrations_applied": 2,
       "ratchet_rollbacks_triggered": 0
     }
   }

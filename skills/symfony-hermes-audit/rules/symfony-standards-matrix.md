@@ -60,7 +60,10 @@ Reference documentation: `controller.rst`, `forms.rst`, `validation.rst`
 
 ### 2.3. Unified Routing & Event Architecture
 * **`NoRoutingPrefixRule`**: Do not hide routing prefixes inside XML/YAML configuration files. The complete route path must be explicitly visible in the `#[Route]` attribute on the controller class or action.
-* **Route Naming**: All route names must follow `snake_case` (e.g., `#[Route('/api/orders/{id}', name: 'api_orders_show', methods: ['GET'])]`).
+* **Route Naming & HTTP Methods**:
+  - All route names must follow `snake_case` (e.g., `#[Route('/api/orders/{id}', name: 'api_orders_show', methods: ['GET'])]`).
+  - Specifying `methods: ['GET', ...]` is recommended for HTTP verb clarity, but omitting it is valid in Symfony (defaults to all methods). Do not flag missing `methods` as a critical bug.
+  - **Separation of Concerns**: Never conflate route method hygiene with controller refactoring (e.g., do not bundle rewriting `index()` to `__invoke()` under a routing method recommendation).
 * **`NoListenerWithoutContractRule` & `NoStringInGetSubscribedEventsRule`**:
   - Loose event listeners without strict interfaces are prohibited; all subscribers must implement `Symfony\Component\EventDispatcher\EventSubscriberInterface`.
   - In `getSubscribedEvents()`, string event names are prohibited when a class constant is available. Always use `EventClass::class`.
@@ -80,10 +83,18 @@ Reference documentation: `doctrine.rst`, `entity.rst`
 ### 3.1. Entity Mapping & Repository Purity
 * **Native PHP Attributes**: All entity mappings must use native attributes (`#[ORM\Entity]`, `#[ORM\Column]`, `#[ORM\ManyToOne]`, etc.). XML, YAML, and legacy annotations (`@ORM\...`) are prohibited.
 * **`ServiceEntityRepository` Inheritance**: Every custom repository must extend `Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository` and invoke `parent::__construct($registry, TargetEntity::class)`.
-* **No Service Locator Repositories**: Calling `$entityManager->getRepository(Entity::class)` in services or controllers is prohibited. Inject the dedicated repository service directly.
+* **Repository Injection Recommendation**:
+  - Prefer injecting the dedicated repository service (e.g., `FaqItemRepository $faqRepository`) directly via constructor property promotion instead of calling `$entityManager->getRepository(Entity::class)`. Direct injection provides static type safety and explicit service contracts.
+  - **Pragmatic Note**: Calling `$entityManager->getRepository(Entity::class)` is standard, supported Doctrine syntax (featured throughout Symfony and Doctrine official documentation). It must be categorized as an optional `MINOR` architectural recommendation, NEVER as a `CRITICAL` anti-pattern or prohibited service locator.
 
 ### 3.2. Absolute Elimination of $N+1$ Queries & Memory Leaks
 * **Prohibition of `findAll()` with In-Memory PHP Filtering**: Calling `findAll()` and subsequently filtering records with `foreach`, `array_filter`, or if-conditions in PHP is a critical defect. All filtering, pagination, and sorting must occur in the database via `QueryBuilder` or `DQL`.
+* **In-Memory Filtering vs `setMaxResults()`**:
+  - Prefer SQL-level limiting (`->setMaxResults($limit)`) over hydrating entire result sets and calling PHP `array_slice()`.
+  - **Pagination Caution**: If the query joins to-many associations (`fetchJoinCollection`), standard SQL `setMaxResults()` truncates related collection rows; use `Doctrine\ORM\Tools\Pagination\Paginator` instead. Always ensure an explicit `orderBy` clause is present so that the limited result set is deterministic.
+* **`EntityManager::flush()` in Loops**:
+  - Avoid calling `flush()` inside iterative loops.
+  - **Caution on State Dependencies**: When moving `flush()` outside a loop, verify whether subsequent loop iterations perform `findOneBy` looking for entities created in previous iterations (since uncommitted entities are not seen by Doctrine queries unless flushed).
 * **Fetch Modes (`LAZY` vs `EXTRA_LAZY`)**:
   - Relationships must default to `fetch: 'LAZY'`.
   - For large collections where code calls `count()`, `contains()`, or `slice()`, use `fetch: 'EXTRA_LAZY'`.
@@ -97,14 +108,19 @@ Reference documentation: `doctrine.rst`, `entity.rst`
 Reference documentation: `contributing/code/standards.rst`, OWASP Symfony Guidelines
 
 ### 4.1. Strict Typing and File Structure
-* **File Header**: Every PHP file must start with `declare(strict_types=1);` followed by an empty line. Files must end with a single LF newline.
-* **Line Length Limit**: Lines must not exceed 120 characters.
+* **File Header**: In greenfield source files and shared packages, add `declare(strict_types=1);` followed by an empty line. Files must end with a single LF newline.
+  - **Pragmatic Scope**: While strongly recommended for type safety, Symfony does not mandate `declare(strict_types=1);` for applications (default Symfony skeleton recipes and `Kernel.php` omit it). Treat missing strict types as an informational/minor recommendation, not a critical architectural defect.
+* **Line Length Limit**: Lines should ideally not exceed 120 characters.
 * **Parameter & Return Types**: All methods and functions must specify full argument and return types. Use `return null;` when explicitly returning `null`, and `return;` in `void` functions. (In PHPUnit test methods, do not append `: void`).
 * **Trailing Commas**: Mandatory trailing commas in multi-line arrays and multi-line constructor property promotion parameter lists.
 * **Blank Line Before Return**: Always include an empty line before a `return` statement, unless `return` is the only statement inside a conditional block.
 
 ### 4.2. Control Structures & Yoda Conditions
-* **Mandatory Yoda Conditions**: For operators `==`, `!=`, `===`, and `!==`, Yoda conditions are mandatory when comparing a variable against a literal, constant, or expression (`null === $user`).
+* **Yoda Conditions Scope & Definition**:
+  - `contributing/code/standards.rst` is the official standard for *contributors to the Symfony framework core* (`symfony/symfony`), not an enforceable mandate for end-user applications.
+  - **Exclusivity to Equality Checks**: When adhering to Yoda style, it applies **EXCLUSIVELY to equality operators**: `==`, `!=`, `===`, and `!==` (e.g., `null === $user`, `'active' === $status`).
+  - **Absolute Ban on Inequality Transformations**: Never transform comparison operators (`<`, `>`, `<=`, `>=`). Transforming `$existing > 0` into `0 < $existing` is strictly incorrect and damages readability.
+  - In user applications, treat Yoda styling as an optional convention or delegate to PHP-CS-Fixer (`yoda_style`), rather than flagging as defects.
 * **No `else` After `return` or `throw`**: Never use `else`, `elseif`, or `break` after a block that terminates with `return` or `throw`.
 * **Explicit Braces**: Control structures must always use braces `{}` regardless of body line count. Class instantiations must always use parentheses: `new DateTimeImmutable()`.
 
@@ -124,8 +140,15 @@ Reference documentation: `contributing/code/standards.rst`, OWASP Symfony Guidel
 * **PHPDoc Hygiene**: No redundant PHPDoc repeating native types. Mandatory array shapes (`list<Order>`, `array<string, mixed>`) and `@throws`. `null` always placed at the end of union types (`@return string|int|null`).
 
 ### 4.5. OWASP Security Standards
-* **`NoErrorSilencingRule`**: The PHP error control operator `@` is strictly prohibited.
-* **Twig Auto-Escaping & `|raw`**: Using the Twig `|raw` filter without pre-sanitization via `HtmlSanitizerInterface` is a critical XSS vulnerability.
+* **`NoErrorSilencingRule` & Socket Stream Polling Exception**:
+  - The PHP error control operator `@` is generally prohibited for masking application logic errors.
+  - **Exception for Low-Level Network/Socket Stream Polling**:
+    In low-level socket functions such as `stream_socket_accept($server, $timeout)` and `stream_socket_server()`, timeouts or non-blocking polling emit an unavoidable PHP `E_WARNING` while returning `false`.
+    In Symfony debug mode, `ErrorHandler` converts all PHP warnings into `ErrorException`. Stripping `@` from `stream_socket_accept` in polling loops will crash the command on the first timeout tick!
+    Therefore, `@stream_socket_accept()` accompanied by an explicit `false === $connection` return check is valid and safe. Alternatively, a scoped `set_error_handler` may be used. Never flag this as a critical vulnerability.
+* **Twig Auto-Escaping & `|raw`**:
+  - Using the Twig `|raw` filter on untrusted user inputs or un-sanitized RichText from the database is an XSS vulnerability.
+  - **False Positive Elimination**: Do NOT flag `|raw` when outputting an internal Twig `{% set var %}...{% endset %}` buffer whose dynamic variables are already escaped inside the loop, or when outputting schema markup from `json_encode` within `<script type="application/ld+json">`.
 * **Open Redirect Prevention**: Never pass unvalidated user inputs from the `Request` directly into `$this->redirect()`.
 * **Authorization Security**: Enforce `#[IsGranted]` attributes or dedicated `Voter` classes (`VoterInterface`).
 
@@ -199,3 +222,19 @@ foreach ($items as $row) {
 $this->entityManager->flush(); // Single consolidated transaction
 ```
 * **Grounding**: `doctrine.rst` (Section: "Batch Processing")
+
+### Pattern #HE-004: Socket Stream Polling and Error Silencing Exception
+* **Discovery Context**: Identified during human review of `ConnectGoogleReviewsCommand`. Stripping `@` from `stream_socket_accept($server, 1)` caused fatal `ErrorException` in Symfony debug mode due to `ErrorHandler` capturing standard timeout `E_WARNING`.
+* **Rule**: `@stream_socket_accept()` or `@stream_socket_server()` with immediate `false === $result` checking is standard low-level PHP I/O and must not be flagged as an OWASP flaw.
+
+### Pattern #HE-005: Yoda Conditions Scope and Inequality Preservation
+* **Discovery Context**: Identified during human review where `$existing > 0` was incorrectly rewritten as `0 < $existing`.
+* **Rule**: Yoda conditions apply strictly to `==`, `!=`, `===`, `!==`. Never transform `<` or `>`. In userland applications, Yoda style is an optional preference.
+
+### Pattern #HE-006: Twig Buffered Blocks (`{% set %}`) and Safe `|raw` Usage
+* **Discovery Context**: Identified in `_faq_list.html.twig` where `{{ faq_items|raw }}` was flagged as XSS despite dynamic variables inside the `{% set %}` block already being auto-escaped by Twig.
+* **Rule**: Verify variable origin before reporting XSS on `|raw`. If the variable is an internal Twig capture block of already escaped variables, `|raw` is safe and required to avoid double-escaping HTML tags.
+
+### Pattern #HE-007: Doctrine `getRepository()` vs Constructor Injection
+* **Discovery Context**: Identified where `$entityManager->getRepository(...)` was mislabeled as a "CRITICAL Service Locator Anti-Pattern".
+* **Rule**: `$entityManager->getRepository()` is valid, fully supported Doctrine syntax. Constructor injection of custom repositories is a clean-code recommendation (`MINOR`), never a critical defect.
