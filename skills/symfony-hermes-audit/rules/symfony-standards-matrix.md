@@ -152,3 +152,50 @@ public function __invoke(ProcessOrderMessage $msg): void {
 }
 ```
 * **Grounding**: `messenger.rst` (Section: "Avoiding Memory Leaks in Long-Running Workers")
+
+### Pattern #HE-002: In-Memory Query Result Slicing vs Database-Level Pagination
+* **Discovery Context**: Discovered during audit of repository list queries (e.g. `FaqItemRepository::findForHome`) where `publishedQuery()->getQuery()->getResult()` was called, followed by `array_slice($items, 0, 5)` in PHP.
+* **Bad Code**:
+```php
+public function findForHome(): array {
+    $items = $this->publishedQuery()
+        ->andWhere('faq.showOnHome = true')
+        ->getQuery()
+        ->getResult();
+
+    return array_slice($items, 0, 5); // Entire table hydrated into memory
+}
+```
+* **Good Code**:
+```php
+public function findForHome(int $limit = 5): array {
+    return $this->publishedQuery()
+        ->andWhere('faq.showOnHome = true')
+        ->setMaxResults($limit) // SQL LIMIT executed at database level
+        ->getQuery()
+        ->getResult();
+}
+```
+* **Grounding**: `doctrine.rst` (Section: "Limiting and Pagination")
+
+### Pattern #HE-003: Iterative EntityManager Flush in Data Seeding & Batch Loops
+* **Discovery Context**: Discovered in command seeders (e.g. `SeedWorkCommand`) where `$this->entityManager->flush()` was executed inside a `foreach` loop for every entity.
+* **Bad Code**:
+```php
+foreach ($items as $row) {
+    $entity = new Entity();
+    $entity->populate($row);
+    $this->entityManager->persist($entity);
+    $this->entityManager->flush(); // Triggers N synchronous round-trips & repeated UoW recalculations
+}
+```
+* **Good Code**:
+```php
+foreach ($items as $row) {
+    $entity = new Entity();
+    $entity->populate($row);
+    $this->entityManager->persist($entity);
+}
+$this->entityManager->flush(); // Single consolidated transaction
+```
+* **Grounding**: `doctrine.rst` (Section: "Batch Processing")
