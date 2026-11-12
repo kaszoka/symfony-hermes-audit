@@ -1,0 +1,42 @@
+{
+  "name": "symfony-hermes-audit",
+  "version": "1.0.0",
+  "description": "Autonomous Symfony Code Audit Skill with Adversarial Tribunal, Hermes Self-Learning Loop & Billion-Context",
+  "author": "kaszoka (https://github.com/kaszoka)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kaszoka/symfony-hermes-audit.git"
+  },
+  "homepage": "https://github.com/kaszoka/symfony-hermes-audit",
+  "type": "module",
+  "bin": {
+    "symfony-hermes-audit": "./bin/cli.mjs"
+  },
+  "files": [
+    "bin",
+    "skills",
+    "SKILL.md"
+  ],
+  "scripts": {
+    "setup": "node ./bin/cli.mjs",
+    "postinstall": "node ./bin/cli.mjs --banner-only || true"
+  },
+  "keywords": [
+    "agent-skills",
+    "skills",
+    "symfony",
+    "php",
+    "claude-code",
+    "cursor",
+    "opencode",
+    "billion-context",
+    "hermes",
+    "kaszoka"
+  ],
+  "dependencies": {
+    "@clack/prompts": "^0.9.0",
+    "boxen": "^8.0.1",
+    "picocolors": "^1.1.1"
+  }
+}
